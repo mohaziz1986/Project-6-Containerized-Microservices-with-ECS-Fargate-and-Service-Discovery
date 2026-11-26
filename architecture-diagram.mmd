@@ -1,0 +1,39 @@
+flowchart LR
+  Client[API Clients] --> IGW[Internet Gateway]
+  IGW --> ALB[Application Load Balancer
+Path-based listener rules]
+  subgraph VPC[Amazon VPC - two Availability Zones]
+    subgraph Public[Public subnets]
+      IGW
+      ALB
+    end
+    subgraph AZ1[Private application subnet - AZ 1]
+      ECS[ECS Cluster - AWS Fargate]
+      AUTH[Auth service task]
+      ORD[Orders service task]
+    end
+    subgraph AZ2[Private application subnet - AZ 2]
+      NOTIF[Notifications service task]
+    end
+    CM[AWS Cloud Map
+Private DNS: service.local]
+  end
+  ALB -->|/api/auth/*| AUTH
+  ALB -->|/api/orders/*| ORD
+  ALB -->|/api/notifications/*| NOTIF
+  ORD -->|auth.service.local| AUTH
+  AUTH -. service registration .-> CM
+  ORD -. service registration .-> CM
+  NOTIF -. service registration .-> CM
+  REDIS[ElastiCache for Redis] --- AUTH
+  REDIS --- ORD
+  SM[AWS Secrets Manager] -. runtime secret injection .-> ECS
+  ECR[Amazon ECR] -. container images .-> ECS
+  AUTH --> CW[Amazon CloudWatch]
+  ORD --> CW
+  NOTIF --> CW
+  AUTH -. trace data .-> XR[AWS X-Ray daemon sidecar]
+  ORD -. trace data .-> XR
+  NOTIF -. trace data .-> XR
+  CICD[CI/CD buildspec and AppSpec templates
+Not provisioned by this CDK stack]
